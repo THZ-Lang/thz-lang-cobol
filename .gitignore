@@ -1,0 +1,12 @@
+# .gitignore para thz-lang-cobol
+.gradle/
+build/
+bin/
+target/
+*.class
+*.jar
+*.log
+.DS_Store
+.idea/
+*.iml
+.vscode/
