@@ -1,0 +1,77 @@
+PROGRAMA DemonstracaoCobolInterop
+
+# ==============================================================================
+# THZ-LANG — Interoperabilidade Nativa com COBOL (LLVM IR / AOT Zero JVM)
+# ==============================================================================
+
+METADADOS_ARQUITETURA
+    DOMINIO: "ModernizacaoFinanceira"
+    SUBDOMINIO: "InteropCOBOL"
+    CAMADA: "Dominio"
+    VERSAO: "0.1.0"
+    AUTOR: "THZ-LANG Architecture Team"
+    SLO_LATENCIA_MAXIMA: "2ms"
+    CONFORMIDADE: "ISO-IEC-10967"
+FIM_METADADOS
+
+# Bloco Embutido de Rotina COBOL Legada (Transpilável para AST e LLVM IR)
+BLOCO_COBOL
+    IDENTIFICATION DIVISION.
+    PROGRAM-ID. CALC-TARIFA.
+    DATA DIVISION.
+    LINKAGE SECTION.
+    01 LK-SALDO     PIC S9(11)V99 COMP-3.
+    01 LK-TARIFA    PIC S9(7)V99 COMP-3.
+    PROCEDURE DIVISION USING LK-SALDO LK-TARIFA.
+        IF LK-SALDO < 1000.00
+            MOVE 25.50 TO LK-TARIFA
+        ELSE
+            MOVE 10.00 TO LK-TARIFA
+        END-IF.
+        GOBACK.
+FIM_BLOCO_COBOL
+
+# Estrutura gerada a partir do Copybook CLIENTE_BANCO.CPY
+ESTRUTURA RegistroClienteBanco
+    cli_id : INTEIRO32
+    cli_nome : TEXTO
+    cli_documento_cpf : INTEIRO
+    cli_saldo_conta : DECIMAL
+    cli_limite_cheque : DECIMAL
+    cli_taxa_juros : DECIMAL
+    cli_status_conta : TEXTO
+FIM_ESTRUTURA
+
+REGRA_NEGOCIO ProcessamentoContasBancarias
+    IDENTIFICADOR_REGRA: "RN-BANCO-001"
+    RASTREIO_REQUISITO: "REQ-COBOL-INTEROP"
+    DESCRICAO: "Executa cálculo de juros e tarifas combinando dados THZ e rotinas COBOL nativas."
+
+    OPERACAO ProcessarConta() : LOGICO
+    INICIO
+        EXIBA "=== DEMO: THZ-LANG INTEGRADO COM COBOL ==="
+
+        VARIAVEL cliente : RegistroClienteBanco <- CRIAR RegistroClienteBanco(
+            cli_id: 102030,
+            cli_nome: "EMPRESA DE TESTE S/A",
+            cli_documento_cpf: 12345678901,
+            cli_saldo_conta: 850.00,
+            cli_limite_cheque: 2000.00,
+            cli_taxa_juros: 1.50,
+            cli_status_conta: "R"
+        )
+
+        EXIBA "Cliente: " + cliente.cli_nome
+        EXIBA "Saldo em Conta: " + TEXTO.deDecimal(cliente.cli_saldo_conta)
+
+        # Invocação da rotina COBOL compilada nativamente via C-ABI / LLVM
+        VARIAVEL tarifaDevida : DECIMAL <- 0.00
+        COBOL.CALC_TARIFA(cliente.cli_saldo_conta, tarifaDevida)
+
+        EXIBA "Tarifa Calculada pelo COBOL: " + TEXTO.deDecimal(tarifaDevida)
+
+        RETORNE VERDADEIRO
+    FIM
+FIM_REGRA_NEGOCIO
+
+FIM_PROGRAMA
