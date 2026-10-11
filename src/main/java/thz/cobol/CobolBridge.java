@@ -61,4 +61,18 @@ public final class CobolBridge {
         CopybookAst dataAst = new CopybookAst(program.programId() + "_DATA", program.workingStorage());
         return CobolLlvmEmitter.emitirLlvmIr(program, dataAst);
     }
+
+    /**
+     * Variação 3: Executa um programa COBOL 100% puro diretamente sob o runtime THZ.
+     */
+    public static thz.cobol.standalone.CobolStandaloneRunner.ExecucaoResultado executarCobolPuro(String codigoCobol) {
+        return thz.cobol.standalone.CobolStandaloneRunner.carregar(codigoCobol).executar();
+    }
+
+    /**
+     * Variação 3: Compila um programa COBOL 100% puro para binário nativo LLVM IR AOT (Zero JVM).
+     */
+    public static thz.cobol.standalone.CobolStandaloneCompiler.CompilacaoResultado compilarCobolPuroParaLlvm(String codigoCobol) {
+        return thz.cobol.standalone.CobolStandaloneCompiler.compilar(codigoCobol);
+    }
 }
