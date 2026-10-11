@@ -69,6 +69,56 @@ public final class CobolStandaloneRunner {
         return new ExecucaoResultado(Collections.unmodifiableMap(storage), Collections.unmodifiableList(outputLogs));
     }
 
+    /**
+     * Executa a lógica da PROCEDURE DIVISION operando in-place sobre o buffer de memória compartilhada.
+     * THZ-LANG e COBOL compartilham o mesmo espaço contíguo de bytes físicos sem cópia.
+     */
+    public ExecucaoResultado executarSobreMemoriaCompartilhada(thz.cobol.runtime.CobolSharedMemorySegment sharedMem) {
+        Objects.requireNonNull(sharedMem, "Segmento de memória compartilhada não pode ser nulo");
+        var layout = sharedMem.getLayout();
+
+        // 1. Sincroniza o estado inicial lendo os bytes físicos contíguos
+        for (var entry : layout.getAllOffsets().entrySet()) {
+            String fieldName = entry.getKey();
+            var fo = entry.getValue();
+            var f = fo.field();
+            if (f.isGroup()) continue;
+
+            Object val = switch (f.getDataType()) {
+                case ALPHANUMERIC -> sharedMem.lerAlfanumerico(fieldName);
+                case PACKED_DECIMAL -> sharedMem.lerDecimalComp3(fieldName);
+                case NUMERIC_DISPLAY, BINARY -> new BigDecimal(sharedMem.lerInteiroDisplay(fieldName));
+                default -> null;
+            };
+            if (val != null) {
+                storage.put(fieldName, val);
+            }
+        }
+
+        // 2. Executa as instruções da PROCEDURE DIVISION
+        ExecucaoResultado res = executar();
+
+        // 3. Escreve in-place de volta na memória compartilhada contígua
+        for (var entry : layout.getAllOffsets().entrySet()) {
+            String fieldName = entry.getKey();
+            var fo = entry.getValue();
+            var f = fo.field();
+            if (f.isGroup()) continue;
+
+            Object val = storage.get(fieldName);
+            if (val == null) continue;
+
+            switch (f.getDataType()) {
+                case ALPHANUMERIC -> sharedMem.escreverAlfanumerico(fieldName, String.valueOf(val));
+                case PACKED_DECIMAL -> sharedMem.escreverDecimalComp3(fieldName, paraBigDecimal(val));
+                case NUMERIC_DISPLAY, BINARY -> sharedMem.escreverInteiroDisplay(fieldName, paraBigDecimal(val).longValue());
+                default -> {}
+            }
+        }
+
+        return res;
+    }
+
     private boolean executarParagrafo(CobolParagraph par) {
         for (CobolStatement stmt : par.statements()) {
             switch (stmt) {

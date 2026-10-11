@@ -105,8 +105,15 @@ public final class CobolLlvmEmitter {
 
     private static void emitComp3Converters(StringBuilder sb) {
         sb.append("; ------------------------------------------------------------------------------\n");
-        sb.append("; Funcoes Nativas de Conversao COMP-3 (Packed Decimal) <-> i128 (THZ-LANG)\n");
+        sb.append("; Memoria Compartilhada Zero-Copy e Conversores COMP-3 <-> i128 (THZ-LANG)\n");
         sb.append("; ------------------------------------------------------------------------------\n\n");
+
+        sb.append("; Acesso transparente a offsets na memoria compartilhada (Zero-Copy)\n");
+        sb.append("define ptr @thz_cobol_campo_ptr(ptr %bufferCompartilhado, i64 %offsetByte) {\n");
+        sb.append("entry:\n");
+        sb.append("    %ptrCampo = getelementptr inbounds i8, ptr %bufferCompartilhado, i64 %offsetByte\n");
+        sb.append("    ret ptr %ptrCampo\n");
+        sb.append("}\n\n");
 
         sb.append("define i128 @thz_cobol_comp3_to_i128(ptr %bytes, i32 %totalDigits, i32 %scale) {\n");
         sb.append("entry:\n");
