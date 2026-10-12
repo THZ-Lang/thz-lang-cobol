@@ -212,10 +212,10 @@ public final class CobolStandaloneRunner {
             }
         }
 
-        return avaliarExpressaoSimples(processada);
+        return avaliarExpressaoInterna(processada).setScale(2, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal avaliarExpressaoSimples(String expr) {
+    private BigDecimal avaliarExpressaoInterna(String expr) {
         // Suporte para expressões aritméticas financeiras básicas: a * (1 + b / 100)
         String s = expr.trim();
 
@@ -223,13 +223,17 @@ public final class CobolStandaloneRunner {
         Pattern parenPattern = Pattern.compile("\\(([^()]+)\\)");
         Matcher m = parenPattern.matcher(s);
         while (m.find()) {
-            BigDecimal sub = avaliarExpressaoSimples(m.group(1));
-            s = s.substring(0, m.start()) + sub.toPlainString() + s.substring(m.end());
+            BigDecimal sub = avaliarExpressaoInterna(m.group(1));
+            s = s.substring(0, m.start()) + " " + sub.toPlainString() + " " + s.substring(m.end());
             m = parenPattern.matcher(s);
         }
 
+        // Garante espaçamento ao redor de operadores
+        s = s.replaceAll("(?<=\\d)\\s*([*+/])\\s*(?=\\d)", " $1 ");
+        s = s.replaceAll("(?<=\\d)\\s*-\\s*(?=\\d)", " - ");
+
         // Divisão e Multiplicação
-        String[] tokens = s.split("\\s+");
+        String[] tokens = s.trim().split("\\s+");
         List<String> list = new ArrayList<>(Arrays.asList(tokens));
 
         for (int i = 0; i < list.size(); i++) {
@@ -237,9 +241,9 @@ public final class CobolStandaloneRunner {
             if (op.equals("*") || op.equals("/")) {
                 BigDecimal a = new BigDecimal(list.get(i - 1));
                 BigDecimal b = new BigDecimal(list.get(i + 1));
-                BigDecimal r = op.equals("*") ? a.multiply(b) : a.divide(b, 4, RoundingMode.HALF_UP);
+                BigDecimal r = op.equals("*") ? a.multiply(b) : a.divide(b, 8, RoundingMode.HALF_UP);
 
-                list.set(i - 1, r.toPlainString());
+                list.set(i - 1, r.stripTrailingZeros().toPlainString());
                 list.remove(i);
                 list.remove(i);
                 i--;
@@ -254,14 +258,14 @@ public final class CobolStandaloneRunner {
                 BigDecimal b = new BigDecimal(list.get(i + 1));
                 BigDecimal r = op.equals("+") ? a.add(b) : a.subtract(b);
 
-                list.set(i - 1, r.toPlainString());
+                list.set(i - 1, r.stripTrailingZeros().toPlainString());
                 list.remove(i);
                 list.remove(i);
                 i--;
             }
         }
 
-        return new BigDecimal(list.get(0)).setScale(2, RoundingMode.HALF_UP);
+        return new BigDecimal(list.get(0));
     }
 
     public record ExecucaoResultado(Map<String, Object> variaveis, List<String> logs) {}

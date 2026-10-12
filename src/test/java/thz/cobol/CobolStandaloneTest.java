@@ -82,4 +82,18 @@ class CobolStandaloneTest {
         assertTrue(resultado.thzEquivalente().contains("PROGRAMA FolhaPagamentoStandalone"));
         assertTrue(resultado.thzEquivalente().contains("REGRA_NEGOCIO RegraFolhaPagamentoStandalone"));
     }
+
+    @Test
+    @DisplayName("Variação 3: Deve executar CALC_JUROS.cbl com precisão matemática em expressões com parênteses")
+    void testExecutarProgramaCalcJuros() throws Exception {
+        String codigo = java.nio.file.Files.readString(java.nio.file.Path.of("exemplos/programas/CALC_JUROS.cbl"));
+        var resultado = CobolBridge.executarCobolPuro(codigo);
+
+        assertNotNull(resultado);
+        assertEquals(new BigDecimal("50000.00"), resultado.variaveis().get("WS-CAPITAL"));
+        assertEquals(new BigDecimal("1.75"), resultado.variaveis().get("WS-TAXA-MENSAL"));
+        assertEquals(new BigDecimal("50875.00"), resultado.variaveis().get("WS-TOTAL-ACUMULADO"));
+        assertEquals(1, resultado.logs().size());
+        assertEquals("Calculo Concluido. Total: 50875.00", resultado.logs().get(0));
+    }
 }

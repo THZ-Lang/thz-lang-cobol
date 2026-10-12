@@ -110,8 +110,8 @@ public final class CobolProcedureParser {
                     continue;
                 }
 
-                // Processa sentenças terminadas em ponto seguido de espaço ou fim de linha (evita quebrar números decimais como 1000.00)
-                String[] sentences = line.split("\\.(?:\\s+|$)");
+                // Processa sentenças terminadas em ponto fora de strings (evita quebrar números decimais ou textos com ponto)
+                List<String> sentences = splitSentences(line);
                 for (String s : sentences) {
                     s = s.trim();
                     if (!s.isBlank()) {
@@ -131,6 +131,42 @@ public final class CobolProcedureParser {
         }
 
         return paragraphs;
+    }
+
+    private static List<String> splitSentences(String line) {
+        List<String> sentences = new ArrayList<>();
+        StringBuilder sb = new StringBuilder();
+        boolean inDoubleQuote = false;
+        boolean inSingleQuote = false;
+
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '"' && !inSingleQuote) {
+                inDoubleQuote = !inDoubleQuote;
+                sb.append(c);
+            } else if (c == '\'' && !inDoubleQuote) {
+                inSingleQuote = !inSingleQuote;
+                sb.append(c);
+            } else if (c == '.' && !inDoubleQuote && !inSingleQuote) {
+                boolean isEndOfSentence = (i + 1 == line.length()) || Character.isWhitespace(line.charAt(i + 1));
+                if (isEndOfSentence) {
+                    String s = sb.toString().trim();
+                    if (!s.isBlank()) {
+                        sentences.add(s);
+                    }
+                    sb.setLength(0);
+                } else {
+                    sb.append(c);
+                }
+            } else {
+                sb.append(c);
+            }
+        }
+        String rem = sb.toString().trim();
+        if (!rem.isBlank()) {
+            sentences.add(rem);
+        }
+        return sentences;
     }
 
     public static CobolStatement parseStatement(String text) {
