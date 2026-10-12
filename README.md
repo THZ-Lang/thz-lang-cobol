@@ -17,3 +17,22 @@ Módulo do ecossistema **THZ-LANG** dedicado à modernização, entendimento, tr
 ## 🚀 Uso Rápido
 
 Consulte a pasta `exemplos/` e a documentação técnica para guia de integração.
+
+### Executando via THZ-Lang (JVM / Standalone)
+```bash
+# Execucao nativa interpretada pelo motor thz-lang-cobol
+thz run exemplos/programas/CALC_JUROS.cbl
+```
+
+### Compilando via Compilador COBOL Nativo de Referência (GnuCOBOL 3.2)
+Para comodidade, conveniência e validação cruzada contra o padrão ANSI/ISO COBOL, o ambiente conta com o **GnuCOBOL 3.2 (MinGW GCC 9.2, BDB 18.1, GMP 6.2.1)** configurado:
+
+```powershell
+# Compilacao direta para executavel nativo .exe
+cobc -x -o calc.exe exemplos/programas/CALC_JUROS.cbl
+.\calc.exe
+
+# Ou utilizando o script utilitario
+.\scripts\compile-cobol.ps1 exemplos\programas\CALC_JUROS.cbl -Run
+```
+

@@ -11,6 +11,7 @@
        PROCESSAR-CALCULO.
            MOVE 50000.00 TO WS-CAPITAL.
            MOVE 1.75 TO WS-TAXA-MENSAL.
-           COMPUTE WS-TOTAL-ACUMULADO = WS-CAPITAL * (1 + WS-TAXA-MENSAL / 100).
+           COMPUTE WS-TOTAL-ACUMULADO = WS-CAPITAL *
+               (1 + WS-TAXA-MENSAL / 100).
            DISPLAY "Calculo Concluido. Total: " WS-TOTAL-ACUMULADO.
            GOBACK.
