@@ -32,7 +32,7 @@ if (-not (Test-Path $SourceFile)) {
 # Localizar cobc no PATH ou em scoop/apps/gnucobol
 $cobcCmd = Get-Command cobc -ErrorAction SilentlyContinue
 if (-not $cobcCmd) {
-    $fallbackDir = "C:\Users\lucas\scoop\apps\gnucobol\current"
+    $fallbackDir = Join-Path $env:USERPROFILE "scoop\apps\gnucobol\current"
     if (Test-Path "$fallbackDir\bin\cobc.exe") {
         $env:COB_MAIN_DIR = "$fallbackDir\"
         $env:COB_CONFIG_DIR = "$fallbackDir\config"
