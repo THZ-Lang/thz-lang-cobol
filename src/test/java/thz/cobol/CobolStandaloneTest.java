@@ -2,10 +2,8 @@ package thz.cobol;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import thz.cobol.standalone.CobolStandaloneCompiler;
-import thz.cobol.standalone.CobolStandaloneRunner;
-
 import java.math.BigDecimal;
+
 
 import static org.junit.jupiter.api.Assertions.*;
 

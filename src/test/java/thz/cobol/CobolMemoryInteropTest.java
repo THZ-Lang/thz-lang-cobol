@@ -120,8 +120,8 @@ class CobolMemoryInteropTest {
     @Test
     @DisplayName("LLVM IR Memória Compartilhada: Emite getelementptr inbounds provando unificação nativa para a máquina")
     void testLlvmIrEmiteAcessoMemoriaCompartilhada() {
-        var copybookAst = CopybookParser.parse("REGISTRO-CLIENTE-CONTA", COPYBOOK_CLIENTE);
-        var prog = CobolProcedureParser.parseProgram(PROGRAMA_COBOL_MUTACAO);
+        assertNotNull(CopybookParser.parse("REGISTRO-CLIENTE-CONTA", COPYBOOK_CLIENTE));
+        assertNotNull(CobolProcedureParser.parseProgram(PROGRAMA_COBOL_MUTACAO));
 
         String llvmIr = CobolBridge.emitirLlvmIr(PROGRAMA_COBOL_MUTACAO);
 

@@ -1,7 +1,7 @@
 package thz.cobol.model;
 
-import java.util.Collections;
 import java.util.List;
+
 
 /**
  * Representa um parágrafo da PROCEDURE DIVISION.

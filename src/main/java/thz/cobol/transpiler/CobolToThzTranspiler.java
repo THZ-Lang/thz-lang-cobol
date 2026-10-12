@@ -112,6 +112,10 @@ public final class CobolToThzTranspiler {
                     sb.append("        PARA i DE 1 ATE ").append(times).append(" PASSO 1 FACA\n");
                     sb.append("            ").append(targetOp).append("()\n");
                     sb.append("        FIM_PARA\n");
+                } else if (until != null && !until.isBlank()) {
+                    sb.append("        ENQUANTO NAO (").append(formatValue(until)).append(") FACA\n");
+                    sb.append("            ").append(targetOp).append("()\n");
+                    sb.append("        FIM_ENQUANTO\n");
                 } else {
                     sb.append("        ").append(targetOp).append("()\n");
                 }

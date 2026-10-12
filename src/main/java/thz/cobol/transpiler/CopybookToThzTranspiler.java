@@ -2,7 +2,6 @@ package thz.cobol.transpiler;
 
 import thz.cobol.model.*;
 
-import java.util.List;
 
 /**
  * CopybookToThzTranspiler — Transpila definições de dados de Copybooks COBOL (.cpy)

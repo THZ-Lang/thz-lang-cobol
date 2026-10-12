@@ -7,7 +7,7 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.math.BigDecimal;
-import java.math.BigInteger;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;

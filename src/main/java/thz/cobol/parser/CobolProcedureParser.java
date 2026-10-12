@@ -39,7 +39,7 @@ public final class CobolProcedureParser {
 
         // Separa seções DATA DIVISION e PROCEDURE DIVISION
         String dataPart = "";
-        String procPart = "";
+        String procPart;
 
         int dataIdx = indexOfIgnoreCase(sourceCode, "DATA DIVISION.");
         int procIdx = indexOfIgnoreCase(sourceCode, "PROCEDURE DIVISION");
@@ -199,7 +199,7 @@ public final class CobolProcedureParser {
 
         Matcher pm = PERFORM_PATTERN.matcher(s);
         if (pm.matches()) {
-            Integer times = pm.group(2) != null ? Integer.parseInt(pm.group(2)) : null;
+            Integer times = pm.group(2) != null ? Integer.valueOf(pm.group(2)) : null;
             return new CobolStatement.Perform(pm.group(1).trim(), times, pm.group(3));
         }
 
