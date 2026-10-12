@@ -93,6 +93,7 @@ public final class CobolProcedureParser {
         List<CobolParagraph> paragraphs = new ArrayList<>();
         String currentParName = "MAIN_LOGIC";
         List<CobolStatement> currentStmts = new ArrayList<>();
+        StringBuilder pendingSentence = new StringBuilder();
 
         try (BufferedReader reader = new BufferedReader(new StringReader(procCode))) {
             String rawLine;
@@ -102,6 +103,13 @@ public final class CobolProcedureParser {
 
                 Matcher parM = PARAGRAPH_PATTERN.matcher(line);
                 if (parM.matches()) {
+                    if (pendingSentence.length() > 0) {
+                        for (String s : splitSentences(pendingSentence.toString(), null)) {
+                            CobolStatement stmt = parseStatement(s.trim());
+                            if (stmt != null) currentStmts.add(stmt);
+                        }
+                        pendingSentence.setLength(0);
+                    }
                     if (!currentStmts.isEmpty()) {
                         paragraphs.add(new CobolParagraph(currentParName, currentStmts));
                         currentStmts = new ArrayList<>();
@@ -110,9 +118,25 @@ public final class CobolProcedureParser {
                     continue;
                 }
 
-                // Processa sentenças terminadas em ponto fora de strings (evita quebrar números decimais ou textos com ponto)
-                List<String> sentences = splitSentences(line);
+                if (pendingSentence.length() > 0) {
+                    pendingSentence.append(" ");
+                }
+                pendingSentence.append(line);
+
+                List<String> sentences = splitSentences(pendingSentence.toString(), pendingSentence);
                 for (String s : sentences) {
+                    s = s.trim();
+                    if (!s.isBlank()) {
+                        CobolStatement stmt = parseStatement(s);
+                        if (stmt != null) {
+                            currentStmts.add(stmt);
+                        }
+                    }
+                }
+            }
+
+            if (pendingSentence.length() > 0) {
+                for (String s : splitSentences(pendingSentence.toString(), null)) {
                     s = s.trim();
                     if (!s.isBlank()) {
                         CobolStatement stmt = parseStatement(s);
@@ -133,7 +157,11 @@ public final class CobolProcedureParser {
         return paragraphs;
     }
 
-    private static List<String> splitSentences(String line) {
+    private static List<String> splitSentences(String text) {
+        return splitSentences(text, null);
+    }
+
+    private static List<String> splitSentences(String line, StringBuilder leftover) {
         List<String> sentences = new ArrayList<>();
         StringBuilder sb = new StringBuilder();
         boolean inDoubleQuote = false;
@@ -163,7 +191,10 @@ public final class CobolProcedureParser {
             }
         }
         String rem = sb.toString().trim();
-        if (!rem.isBlank()) {
+        if (leftover != null) {
+            leftover.setLength(0);
+            leftover.append(rem);
+        } else if (!rem.isBlank()) {
             sentences.add(rem);
         }
         return sentences;

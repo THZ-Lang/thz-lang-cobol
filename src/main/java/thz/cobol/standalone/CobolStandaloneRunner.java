@@ -239,6 +239,9 @@ public final class CobolStandaloneRunner {
         for (int i = 0; i < list.size(); i++) {
             String op = list.get(i);
             if (op.equals("*") || op.equals("/")) {
+                if (i == 0 || i + 1 >= list.size()) {
+                    throw new IllegalArgumentException("Expressão aritmética malformatada ao redor do operador: " + op);
+                }
                 BigDecimal a = new BigDecimal(list.get(i - 1));
                 BigDecimal b = new BigDecimal(list.get(i + 1));
                 BigDecimal r = op.equals("*") ? a.multiply(b) : a.divide(b, 8, RoundingMode.HALF_UP);
@@ -254,6 +257,9 @@ public final class CobolStandaloneRunner {
         for (int i = 0; i < list.size(); i++) {
             String op = list.get(i);
             if (op.equals("+") || op.equals("-")) {
+                if (i == 0 || i + 1 >= list.size()) {
+                    throw new IllegalArgumentException("Expressão aritmética malformatada ao redor do operador: " + op);
+                }
                 BigDecimal a = new BigDecimal(list.get(i - 1));
                 BigDecimal b = new BigDecimal(list.get(i + 1));
                 BigDecimal r = op.equals("+") ? a.add(b) : a.subtract(b);
@@ -263,6 +269,10 @@ public final class CobolStandaloneRunner {
                 list.remove(i);
                 i--;
             }
+        }
+
+        if (list.isEmpty()) {
+            return BigDecimal.ZERO;
         }
 
         return new BigDecimal(list.get(0));
