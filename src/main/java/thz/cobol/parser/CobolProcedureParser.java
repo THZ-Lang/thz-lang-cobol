@@ -56,24 +56,38 @@ public final class CobolProcedureParser {
         // Analisa DATA DIVISION se presente
         List<CobolField> workingStorage = List.of();
         List<CobolField> linkageSection = List.of();
+        List<CobolScreenItem> screenSection = List.of();
 
         if (!dataPart.isBlank()) {
-            int wsIdx = indexOfIgnoreCase(dataPart, "WORKING-STORAGE SECTION.");
-            int lkIdx = indexOfIgnoreCase(dataPart, "LINKAGE SECTION.");
+            record SecaoEncontrada(String nome, int start, int headerLen) {}
+            List<SecaoEncontrada> secoes = new ArrayList<>();
 
-            if (wsIdx >= 0 && lkIdx > wsIdx) {
-                String wsContent = dataPart.substring(wsIdx + "WORKING-STORAGE SECTION.".length(), lkIdx);
-                String lkContent = dataPart.substring(lkIdx + "LINKAGE SECTION.".length());
-                workingStorage = CopybookParser.parse(programId + "_WS", wsContent).getRootFields();
-                linkageSection = CopybookParser.parse(programId + "_LK", lkContent).getRootFields();
-            } else if (wsIdx >= 0) {
-                String wsContent = dataPart.substring(wsIdx + "WORKING-STORAGE SECTION.".length());
-                workingStorage = CopybookParser.parse(programId + "_WS", wsContent).getRootFields();
-            } else if (lkIdx >= 0) {
-                String lkContent = dataPart.substring(lkIdx + "LINKAGE SECTION.".length());
-                linkageSection = CopybookParser.parse(programId + "_LK", lkContent).getRootFields();
-            } else {
+            int wsIdx = indexOfIgnoreCase(dataPart, "WORKING-STORAGE SECTION.");
+            if (wsIdx >= 0) secoes.add(new SecaoEncontrada("WS", wsIdx, "WORKING-STORAGE SECTION.".length()));
+
+            int lkIdx = indexOfIgnoreCase(dataPart, "LINKAGE SECTION.");
+            if (lkIdx >= 0) secoes.add(new SecaoEncontrada("LK", lkIdx, "LINKAGE SECTION.".length()));
+
+            int scIdx = indexOfIgnoreCase(dataPart, "SCREEN SECTION.");
+            if (scIdx >= 0) secoes.add(new SecaoEncontrada("SC", scIdx, "SCREEN SECTION.".length()));
+
+            secoes.sort(Comparator.comparingInt(SecaoEncontrada::start));
+
+            if (secoes.isEmpty()) {
                 workingStorage = CopybookParser.parse(programId + "_DATA", dataPart).getRootFields();
+            } else {
+                for (int i = 0; i < secoes.size(); i++) {
+                    SecaoEncontrada atual = secoes.get(i);
+                    int inicioConteudo = atual.start + atual.headerLen;
+                    int fimConteudo = (i + 1 < secoes.size()) ? secoes.get(i + 1).start : dataPart.length();
+                    String conteudo = dataPart.substring(inicioConteudo, fimConteudo);
+
+                    switch (atual.nome) {
+                        case "WS" -> workingStorage = CopybookParser.parse(programId + "_WS", conteudo).getRootFields();
+                        case "LK" -> linkageSection = CopybookParser.parse(programId + "_LK", conteudo).getRootFields();
+                        case "SC" -> screenSection = parseScreenSection(conteudo);
+                    }
+                }
             }
         }
 
@@ -86,7 +100,124 @@ public final class CobolProcedureParser {
         }
 
         List<CobolParagraph> paragraphs = parseParagraphs(procPart);
-        return new CobolProgram(programId, workingStorage, linkageSection, paragraphs);
+        return new CobolProgram(programId, workingStorage, linkageSection, paragraphs, screenSection);
+    }
+
+    private static List<CobolScreenItem> parseScreenSection(String scContent) {
+        if (scContent == null || scContent.isBlank()) return List.of();
+        List<CobolScreenItem> roots = new ArrayList<>();
+        CobolScreenItem.Builder currentRoot = null;
+        List<CobolScreenItem> currentChildren = new ArrayList<>();
+
+        // Normaliza linhas e divide por declarações de nível (ex: 01 ..., 05 ...)
+        String[] lines = scContent.split("\\R");
+        StringBuilder currentStmt = new StringBuilder();
+
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("*")) continue;
+
+            if (trimmed.matches("^\\d{2}\\b.*")) {
+                if (!currentStmt.isEmpty()) {
+                    processScreenStatement(currentStmt.toString(), roots, currentChildren);
+                    currentStmt.setLength(0);
+                }
+            }
+            if (!currentStmt.isEmpty()) currentStmt.append(" ");
+            currentStmt.append(trimmed);
+        }
+        if (!currentStmt.isEmpty()) {
+            processScreenStatement(currentStmt.toString(), roots, currentChildren);
+        }
+
+        // Consolida último root se houver
+        if (!currentChildren.isEmpty() && !roots.isEmpty()) {
+            int lastIdx = roots.size() - 1;
+            CobolScreenItem last = roots.get(lastIdx);
+            roots.set(lastIdx, new CobolScreenItem(
+                    last.name(), last.level(), last.line(), last.column(), last.value(),
+                    last.foregroundColor(), last.backgroundColor(),
+                    last.highlight(), last.reverseVideo(), last.blink(), last.blankScreen(),
+                    last.fromField(), last.toField(), last.usingField(),
+                    List.copyOf(currentChildren)
+            ));
+        }
+
+        return List.copyOf(roots);
+    }
+
+    private static void processScreenStatement(String stmt, List<CobolScreenItem> roots, List<CobolScreenItem> currentChildren) {
+        String clean = stmt.trim();
+        if (clean.endsWith(".")) clean = clean.substring(0, clean.length() - 1).trim();
+
+        Matcher levelM = Pattern.compile("^(\\d{2})(?:\\s+([A-Z0-9_-]+))?", Pattern.CASE_INSENSITIVE).matcher(clean);
+        if (!levelM.find()) return;
+
+        int level = Integer.parseInt(levelM.group(1));
+        String name = levelM.group(2) != null ? levelM.group(2).toUpperCase() : "";
+
+        CobolScreenItem.Builder builder = CobolScreenItem.builder(name, level);
+
+        if (Pattern.compile("\\bBLANK\\s+SCREEN\\b", Pattern.CASE_INSENSITIVE).matcher(clean).find()) {
+            builder.blankScreen(true);
+        }
+        if (Pattern.compile("\\bHIGHLIGHT\\b", Pattern.CASE_INSENSITIVE).matcher(clean).find()) {
+            builder.highlight(true);
+        }
+        if (Pattern.compile("\\bREVERSE-VIDEO\\b", Pattern.CASE_INSENSITIVE).matcher(clean).find()) {
+            builder.reverseVideo(true);
+        }
+        if (Pattern.compile("\\bBLINK\\b", Pattern.CASE_INSENSITIVE).matcher(clean).find()) {
+            builder.blink(true);
+        }
+
+        Matcher lineM = Pattern.compile("\\bLINE(?:\\s+IS)?\\s+(\\d+)", Pattern.CASE_INSENSITIVE).matcher(clean);
+        if (lineM.find()) builder.line(Integer.parseInt(lineM.group(1)));
+
+        Matcher colM = Pattern.compile("\\b(?:COL|COLUMN)(?:\\s+IS)?\\s+(\\d+)", Pattern.CASE_INSENSITIVE).matcher(clean);
+        if (colM.find()) builder.column(Integer.parseInt(colM.group(1)));
+
+        Matcher fgM = Pattern.compile("\\bFOREGROUND-COLOU?R(?:\\s+IS)?\\s+(\\d+)", Pattern.CASE_INSENSITIVE).matcher(clean);
+        if (fgM.find()) builder.foregroundColor(Integer.parseInt(fgM.group(1)));
+
+        Matcher bgM = Pattern.compile("\\bBACKGROUND-COLOU?R(?:\\s+IS)?\\s+(\\d+)", Pattern.CASE_INSENSITIVE).matcher(clean);
+        if (bgM.find()) builder.backgroundColor(Integer.parseInt(bgM.group(1)));
+
+        Matcher valM = Pattern.compile("\\bVALUE(?:\\s+IS)?\\s+(\"([^\"]*)\"|'([^']*)')", Pattern.CASE_INSENSITIVE).matcher(clean);
+        if (valM.find()) {
+            String v = valM.group(2) != null ? valM.group(2) : valM.group(3);
+            builder.value(v);
+        }
+
+        Matcher fromM = Pattern.compile("\\bFROM\\s+([A-Z0-9_-]+)", Pattern.CASE_INSENSITIVE).matcher(clean);
+        if (fromM.find()) builder.fromField(fromM.group(1).toUpperCase());
+
+        Matcher toM = Pattern.compile("\\bTO\\s+([A-Z0-9_-]+)", Pattern.CASE_INSENSITIVE).matcher(clean);
+        if (toM.find()) builder.toField(toM.group(1).toUpperCase());
+
+        Matcher usingM = Pattern.compile("\\bUSING\\s+([A-Z0-9_-]+)", Pattern.CASE_INSENSITIVE).matcher(clean);
+        if (usingM.find()) builder.usingField(usingM.group(1).toUpperCase());
+
+        CobolScreenItem item = builder.build();
+
+        if (level == 1) {
+            // Se já tínhamos um root anterior com filhos, consolida-o
+            if (!currentChildren.isEmpty() && !roots.isEmpty()) {
+                int lastIdx = roots.size() - 1;
+                CobolScreenItem last = roots.get(lastIdx);
+                roots.set(lastIdx, new CobolScreenItem(
+                        last.name(), last.level(), last.line(), last.column(), last.value(),
+                        last.foregroundColor(), last.backgroundColor(),
+                        last.highlight(), last.reverseVideo(), last.blink(), last.blankScreen(),
+                        last.fromField(), last.toField(), last.usingField(),
+                        List.copyOf(currentChildren)
+                ));
+                currentChildren.clear();
+            }
+            roots.add(item);
+        } else {
+            currentChildren.add(item);
+        }
     }
 
     private static List<CobolParagraph> parseParagraphs(String procCode) {

@@ -17,6 +17,7 @@ public final class CobolStandaloneRunner {
 
     private final CobolProgram program;
     private final Map<String, Object> storage = new LinkedHashMap<>();
+    private final Map<String, CobolScreenItem> screenItems = new LinkedHashMap<>();
     private final List<String> outputLogs = new ArrayList<>();
 
     public CobolStandaloneRunner(CobolProgram program) {
@@ -32,6 +33,18 @@ public final class CobolStandaloneRunner {
     private void inicializarVariaveis() {
         for (CobolField f : program.workingStorage()) {
             cadastrarCampos(f);
+        }
+        for (CobolScreenItem s : program.screenSection()) {
+            cadastrarScreenItem(s);
+        }
+    }
+
+    private void cadastrarScreenItem(CobolScreenItem item) {
+        if (item.name() != null && !item.name().isBlank()) {
+            screenItems.put(item.name().toUpperCase(), item);
+        }
+        for (CobolScreenItem child : item.children()) {
+            cadastrarScreenItem(child);
         }
     }
 
@@ -145,23 +158,27 @@ public final class CobolStandaloneRunner {
                     storage.put(target, sub);
                 }
                 case CobolStatement.Display(List<String> items) -> {
-                    StringBuilder line = new StringBuilder();
-                    for (int i = 0; i < items.size(); i++) {
-                        String it = items.get(i);
-                        String valor;
-                        if ((it.startsWith("\"") && it.endsWith("\"")) || (it.startsWith("'") && it.endsWith("'"))) {
-                            valor = it.substring(1, it.length() - 1);
-                        } else if (storage.containsKey(it.toUpperCase())) {
-                            valor = String.valueOf(storage.get(it.toUpperCase()));
-                        } else {
-                            valor = it;
+                    if (items.size() == 1 && screenItems.containsKey(items.get(0).toUpperCase())) {
+                        renderizarItemTela(screenItems.get(items.get(0).toUpperCase()));
+                    } else {
+                        StringBuilder line = new StringBuilder();
+                        for (int i = 0; i < items.size(); i++) {
+                            String it = items.get(i);
+                            String valor;
+                            if ((it.startsWith("\"") && it.endsWith("\"")) || (it.startsWith("'") && it.endsWith("'"))) {
+                                valor = it.substring(1, it.length() - 1);
+                            } else if (storage.containsKey(it.toUpperCase())) {
+                                valor = String.valueOf(storage.get(it.toUpperCase()));
+                            } else {
+                                valor = it;
+                            }
+                            if (!line.isEmpty() && !line.toString().endsWith(" ") && !valor.startsWith(" ")) {
+                                line.append(" ");
+                            }
+                            line.append(valor);
                         }
-                        if (!line.isEmpty() && !line.toString().endsWith(" ") && !valor.startsWith(" ")) {
-                            line.append(" ");
-                        }
-                        line.append(valor);
+                        outputLogs.add(line.toString().trim());
                     }
-                    outputLogs.add(line.toString().trim());
                 }
                 case CobolStatement.Goback() -> {
                     return true; // Encerra execução (GOBACK / STOP RUN)
@@ -170,6 +187,83 @@ public final class CobolStandaloneRunner {
             }
         }
         return false;
+    }
+
+    private void renderizarItemTela(CobolScreenItem screen) {
+        if (screen.blankScreen()) {
+            outputLogs.add("\033[2J\033[H");
+        }
+        renderizarLinhaTela(screen);
+        for (CobolScreenItem child : screen.children()) {
+            if (child.blankScreen()) {
+                outputLogs.add("\033[2J\033[H");
+            }
+            renderizarLinhaTela(child);
+        }
+    }
+
+    private void renderizarLinhaTela(CobolScreenItem item) {
+        String texto = "";
+        if (item.value() != null && !item.value().isBlank()) {
+            texto = item.value();
+        } else if (item.usingField() != null && storage.containsKey(item.usingField().toUpperCase())) {
+            texto = String.valueOf(storage.get(item.usingField().toUpperCase()));
+        } else if (item.fromField() != null && storage.containsKey(item.fromField().toUpperCase())) {
+            texto = String.valueOf(storage.get(item.fromField().toUpperCase()));
+        } else if (item.toField() != null && storage.containsKey(item.toField().toUpperCase())) {
+            texto = String.valueOf(storage.get(item.toField().toUpperCase()));
+        }
+
+        if (texto.isEmpty() && !item.blankScreen() && item.line() == null) {
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        if (item.line() != null && item.column() != null) {
+            sb.append(String.format("\033[%d;%dH", item.line(), item.column()));
+        }
+
+        List<String> sgr = new ArrayList<>();
+        if (item.highlight()) sgr.add("1");
+        if (item.reverseVideo()) sgr.add("7");
+        if (item.blink()) sgr.add("5");
+
+        if (item.foregroundColor() != null) {
+            sgr.add(String.valueOf(cobolParaAnsiFg(item.foregroundColor())));
+        }
+        if (item.backgroundColor() != null) {
+            sgr.add(String.valueOf(cobolParaAnsiBg(item.backgroundColor())));
+        }
+
+        if (!sgr.isEmpty()) {
+            sb.append("\033[").append(String.join(";", sgr)).append("m");
+        }
+
+        sb.append(texto);
+
+        if (!sgr.isEmpty()) {
+            sb.append("\033[0m");
+        }
+
+        outputLogs.add(sb.toString());
+    }
+
+    private static int cobolParaAnsiFg(int cobolColor) {
+        return switch (cobolColor % 8) {
+            case 0 -> 30; // Preto
+            case 1 -> 34; // Azul
+            case 2 -> 32; // Verde
+            case 3 -> 36; // Ciano
+            case 4 -> 31; // Vermelho
+            case 5 -> 35; // Magenta
+            case 6 -> 33; // Marrom / Amarelo
+            case 7 -> 37; // Branco
+            default -> 37;
+        };
+    }
+
+    private static int cobolParaAnsiBg(int cobolColor) {
+        return cobolParaAnsiFg(cobolColor) + 10;
     }
 
     private Object avaliarValor(String raw) {
